@@ -1,0 +1,1281 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Periodic C² Cubic B-Spline Designer</title>
+
+        <script>
+            window.MathJax = {
+                tex: {
+                    inlineMath: [
+                        ["$", "$"],
+                        ["\\(", "\\)"],
+                    ],
+                },
+                svg: { fontCache: "global" },
+            };
+        </script>
+        <script
+            defer
+            src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js"
+        ></script>
+
+        <style>
+            :root {
+                --bg: #f4f7fb;
+                --panel: #ffffff;
+                --text: #1f2937;
+                --muted: #6b7280;
+                --border: #d1d5db;
+                --blue: #2563eb;
+                --blue-soft: #dbeafe;
+                --shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+                --radius: 16px;
+                --right-width: 430px;
+                --right-collapsed: 56px;
+            }
+
+            * {
+                box-sizing: border-box;
+            }
+
+            html,
+            body {
+                margin: 0;
+                height: 100%;
+                background: var(--bg);
+                color: var(--text);
+                font-family:
+                    Inter,
+                    -apple-system,
+                    BlinkMacSystemFont,
+                    "Segoe UI",
+                    Roboto,
+                    Helvetica,
+                    Arial,
+                    sans-serif;
+                overflow: hidden;
+            }
+
+            .app {
+                height: 100vh;
+                display: flex;
+                gap: 0;
+                padding: 16px;
+            }
+
+            .left-panel {
+                flex: 1 1 auto;
+                min-width: 0;
+                display: flex;
+                flex-direction: column;
+                gap: 12px;
+                padding-right: 12px;
+                transition:
+                    width 0.25s ease,
+                    flex-basis 0.25s ease;
+            }
+
+            .header {
+                background: var(--panel);
+                border-radius: var(--radius);
+                box-shadow: var(--shadow);
+                padding: 16px 18px;
+                display: grid;
+                gap: 8px;
+            }
+
+            .header h1 {
+                margin: 0;
+                font-size: 1.3rem;
+                line-height: 1.2;
+            }
+
+            .header p {
+                margin: 0;
+                color: var(--muted);
+                font-size: 0.94rem;
+            }
+
+            .toolbar {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 10px;
+                align-items: center;
+                justify-content: space-between;
+            }
+
+            .toolbar .group {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 10px;
+                align-items: center;
+            }
+
+            button {
+                border: 0;
+                background: var(--blue);
+                color: white;
+                padding: 10px 14px;
+                border-radius: 12px;
+                font-weight: 600;
+                cursor: pointer;
+                box-shadow: 0 4px 14px rgba(37, 99, 235, 0.2);
+            }
+
+            button.secondary {
+                background: #e5e7eb;
+                color: #111827;
+                box-shadow: none;
+            }
+
+            button:active {
+                transform: translateY(1px);
+            }
+
+            .stats {
+                color: var(--muted);
+                font-size: 0.92rem;
+                display: flex;
+                flex-wrap: wrap;
+                gap: 14px;
+            }
+
+            .canvas-card {
+                flex: 1 1 auto;
+                min-height: 0;
+                background: var(--panel);
+                border-radius: var(--radius);
+                box-shadow: var(--shadow);
+                padding: 14px;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                position: relative;
+            }
+
+            canvas {
+                width: 100%;
+                max-height: 100%;
+                border: 1px solid var(--border);
+                border-radius: 14px;
+                background: linear-gradient(180deg, #fcfcfd, #f8fafc);
+                touch-action: none;
+                display: block;
+                cursor: grab;
+            }
+
+            canvas:active {
+                cursor: grabbing;
+            }
+
+            .canvas-scale-controls {
+                position: absolute;
+                top: 24px;
+                right: 24px;
+                display: grid;
+                gap: 8px;
+                z-index: 2;
+            }
+
+            .canvas-scale-controls button {
+                width: 36px;
+                height: 36px;
+                padding: 0;
+                border-radius: 10px;
+                background: rgba(255, 255, 255, 0.92);
+                color: #1d4ed8;
+                border: 1px solid #bfdbfe;
+                box-shadow: 0 6px 18px rgba(31, 41, 55, 0.16);
+                font-size: 1.25rem;
+                line-height: 1;
+            }
+
+            .canvas-edit-controls {
+                position: absolute;
+                right: 14px;
+                bottom: 14px;
+                display: flex;
+                align-items: stretch;
+                gap: 0;
+                z-index: 2;
+                height: 154px;
+            }
+
+            .edit-tools-panel {
+                display: grid;
+                gap: 8px;
+                padding: 8px;
+                height: 100%;
+                border: 1px solid #dbeafe;
+                border-radius: 0 12px 12px 0;
+                background: rgba(255, 255, 255, 0.94);
+                box-shadow: 0 8px 22px rgba(31, 41, 55, 0.16);
+            }
+
+            .edit-tools-panel button {
+                width: 112px;
+                box-shadow: none;
+            }
+
+            .canvas-edit-toggle {
+                width: 36px;
+                height: 100%;
+                padding: 0;
+                border-radius: 12px 0 0 12px;
+                background: var(--blue-soft);
+                color: #1d4ed8;
+                border: 1px solid #bfdbfe;
+                border-right: 0;
+                box-shadow: 0 6px 18px rgba(31, 41, 55, 0.16);
+                line-height: 1;
+            }
+
+            .canvas-edit-toggle svg {
+                display: block;
+                margin: auto;
+                transition: transform 0.18s ease;
+            }
+
+            .canvas-edit-controls.collapsed .canvas-edit-toggle svg {
+                transform: rotate(180deg);
+            }
+
+            .canvas-edit-controls.collapsed .edit-tools-panel {
+                display: none;
+            }
+
+            .right-panel {
+                width: var(--right-width);
+                min-width: var(--right-collapsed);
+                background: var(--panel);
+                border-radius: var(--radius);
+                box-shadow: var(--shadow);
+                overflow: hidden;
+                display: flex;
+                flex-direction: column;
+                transition:
+                    width 0.28s ease,
+                    min-width 0.28s ease,
+                    padding 0.28s ease;
+                position: relative;
+            }
+
+            .right-panel.collapsed {
+                width: var(--right-collapsed);
+                min-width: var(--right-collapsed);
+            }
+
+            .right-topbar {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                gap: 10px;
+                padding: 14px 14px 12px;
+                border-bottom: 1px solid var(--border);
+                background: #fafafa;
+            }
+
+            .right-title {
+                font-weight: 700;
+                font-size: 0.98rem;
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+            }
+
+            .collapse-btn {
+                background: var(--blue-soft);
+                color: #1d4ed8;
+                box-shadow: none;
+                padding: 8px 10px;
+                border-radius: 10px;
+                font-weight: 700;
+                line-height: 1;
+                min-width: 36px;
+            }
+
+            .right-content {
+                flex: 1 1 auto;
+                min-height: 0;
+                overflow: auto;
+                padding: 14px;
+                display: grid;
+                gap: 14px;
+            }
+
+            .right-panel.collapsed .right-content,
+            .right-panel.collapsed .right-title,
+            .right-panel.collapsed .right-main {
+                display: none;
+            }
+
+            .collapsed-tab {
+                display: none;
+                writing-mode: vertical-rl;
+                text-orientation: mixed;
+                transform: rotate(180deg);
+                font-weight: 700;
+                letter-spacing: 0.06em;
+                color: #1d4ed8;
+                align-items: center;
+                justify-content: center;
+                height: 100%;
+                width: 100%;
+                cursor: pointer;
+                user-select: none;
+                background: linear-gradient(180deg, #eff6ff, #dbeafe);
+            }
+
+            .right-panel.collapsed .collapsed-tab {
+                display: flex;
+            }
+
+            .section {
+                background: #f9fafb;
+                border: 1px solid #edf0f4;
+                border-radius: 14px;
+                padding: 12px;
+            }
+
+            .section-header {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                gap: 10px;
+                margin-bottom: 10px;
+            }
+
+            .section h3 {
+                margin: 0;
+                font-size: 0.95rem;
+            }
+
+            .section-toggle {
+                background: var(--blue-soft);
+                color: #1d4ed8;
+                box-shadow: none;
+                padding: 6px 9px;
+                border-radius: 9px;
+                line-height: 1;
+                min-width: 32px;
+            }
+
+            .section.collapsed .section-body {
+                display: none;
+            }
+
+            .section.collapsed .section-header {
+                margin-bottom: 0;
+            }
+
+            .points-list {
+                font-size: 0.9rem;
+                color: #374151;
+                display: grid;
+                gap: 6px;
+            }
+
+            .equations {
+                display: grid;
+                gap: 10px;
+            }
+
+            .eq-block {
+                background: #fff;
+                border: 1px solid #e5e7eb;
+                border-radius: 12px;
+                padding: 10px 12px;
+                overflow: hidden;
+            }
+
+            .eq-block mjx-container {
+                max-width: 100%;
+                font-size: 88% !important;
+            }
+
+            .eq-label {
+                font-size: 0.8rem;
+                text-transform: uppercase;
+                letter-spacing: 0.05em;
+                color: #1d4ed8;
+                margin-bottom: 6px;
+                font-weight: 700;
+            }
+
+            .hint {
+                color: var(--muted);
+                font-size: 0.9rem;
+                margin: 0;
+            }
+
+            .split-note {
+                color: var(--muted);
+                font-size: 0.86rem;
+                margin: 0;
+            }
+
+            .mobile-note {
+                display: none;
+                color: var(--muted);
+                font-size: 0.9rem;
+            }
+
+            @media (max-width: 960px) {
+                .app {
+                    flex-direction: column;
+                    overflow: auto;
+                    height: auto;
+                    min-height: 100vh;
+                }
+
+                html,
+                body {
+                    overflow: auto;
+                }
+
+                .left-panel {
+                    padding-right: 0;
+                }
+
+                .right-panel {
+                    width: 100%;
+                    min-width: 0;
+                    height: 520px;
+                }
+            }
+
+            @media (max-width: 640px) {
+                .mobile-note {
+                    display: block;
+                }
+
+                .eq-block mjx-container {
+                    font-size: 78% !important;
+                }
+            }
+        </style>
+    </head>
+    <body>
+        <div class="app">
+            <div class="left-panel">
+                <div class="header">
+                    <div class="toolbar">
+                        <div class="group">
+                            <div class="stats">
+                                <div id="lengthStat">Length: —</div>
+                                <div id="activeStat">Active point: none</div>
+                            </div>
+                        </div>
+                    </div>
+                    <h1>Periodic C² Cubic B-Spline Designer</h1>
+                    <p>
+                        Drag the blue control points in the left panel.
+                        Coordinates and equations use the centered axes with
+                        origin at (0, 0).
+                    </p>
+                    <p class="mobile-note">
+                        On small screens the right panel can be collapsed to
+                        give the canvas full focus.
+                    </p>
+                </div>
+
+                <div class="canvas-card">
+                    <div
+                        class="canvas-scale-controls"
+                        aria-label="Resize shape controls"
+                    >
+                        <button
+                            onclick="resizeShape(1.15)"
+                            title="Enlarge shape"
+                        >
+                            +
+                        </button>
+                        <button
+                            onclick="resizeShape(0.85)"
+                            title="Make shape smaller"
+                        >
+                            −
+                        </button>
+                    </div>
+                    <div class="canvas-edit-controls" id="canvasEditControls">
+                        <button
+                            class="canvas-edit-toggle"
+                            id="editControlsToggle"
+                            title="Collapse canvas controls"
+                        >
+                            <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                viewBox="0 0 24 24"
+                                width="24"
+                                height="24"
+                                color="currentColor"
+                                fill="none"
+                                aria-hidden="true"
+                            >
+                                <path
+                                    fill="currentColor"
+                                    d="M8.557,17.396 C8.719,17.274 9.2,16.91 9.478,16.694 C10.034,16.26 10.773,15.666 11.51,15.027 C12.251,14.384 12.972,13.708 13.502,13.108 C13.768,12.807 13.97,12.543 14.102,12.325 C14.226,12.119 14.251,11.998 14.251,11.998 C14.251,11.998 14.226,11.881 14.102,11.675 C13.97,11.457 13.768,11.193 13.502,10.892 C12.972,10.292 12.251,9.617 11.51,8.973 C10.773,8.334 10.034,7.741 9.478,7.306 C9.2,7.09 8.719,6.726 8.558,6.604 C8.224,6.359 8.152,5.889 8.398,5.555 C8.644,5.222 9.113,5.151 9.447,5.396 L9.449,5.398 C9.618,5.526 10.117,5.903 10.401,6.124 C10.97,6.568 11.731,7.178 12.494,7.841 C13.253,8.5 14.032,9.226 14.627,9.899 C14.923,10.235 15.19,10.575 15.386,10.901 C15.571,11.207 15.752,11.594 15.752,12 C15.752,12.407 15.571,12.793 15.386,13.099 C15.19,13.425 14.923,13.765 14.627,14.101 C14.032,14.774 13.253,15.5 12.494,16.159 C11.731,16.822 10.97,17.432 10.401,17.876 C10.117,18.097 9.618,18.474 9.449,18.602 L9.447,18.604 C9.114,18.849 8.644,18.778 8.398,18.445 C8.152,18.111 8.224,17.642 8.557,17.396 Z"
+                                ></path>
+                            </svg>
+                        </button>
+                        <div class="edit-tools-panel">
+                            <button onclick="addPoint()">Add Point</button>
+                            <button class="secondary" onclick="removePoint()">
+                                Remove Point
+                            </button>
+                            <button class="secondary" onclick="resetPoints()">
+                                Reset
+                            </button>
+                        </div>
+                    </div>
+                    <canvas
+                        id="canvas"
+                        width="900"
+                        height="900"
+                        aria-label="Spline editor canvas"
+                    ></canvas>
+                </div>
+            </div>
+
+            <aside class="right-panel" id="rightPanel">
+                <div class="right-topbar">
+                    <div class="right-title">Equations and control points</div>
+                    <button
+                        class="collapse-btn"
+                        id="toggleBtn"
+                        title="Collapse panel"
+                    >
+                        ⇦
+                    </button>
+                </div>
+
+                <div class="collapsed-tab" id="collapsedTab">Equations</div>
+
+                <div class="right-content">
+                    <div class="section right-main" id="pointsSection">
+                        <div class="section-header">
+                            <h3>Control points</h3>
+                            <button
+                                class="section-toggle"
+                                id="pointsToggle"
+                                title="Collapse control points"
+                            >
+                                −
+                            </button>
+                        </div>
+                        <div class="section-body">
+                            <div class="points-list" id="pointsList"></div>
+                        </div>
+                    </div>
+
+                    <div class="section right-main" id="equationsSection">
+                        <div class="section-header">
+                            <h3>Parametric equations</h3>
+                            <button
+                                class="section-toggle"
+                                id="equationsToggle"
+                                title="Collapse parametric equations"
+                            >
+                                −
+                            </button>
+                        </div>
+                        <div class="section-body">
+                            <p class="hint">
+                                Each segment is written as a cubic polynomial in
+                                \(u\in[0,1]\).
+                            </p>
+                            <div class="equations" id="equations"></div>
+                        </div>
+                    </div>
+                </div>
+            </aside>
+        </div>
+
+        <script>
+            const canvas = document.getElementById("canvas");
+            const ctx = canvas.getContext("2d");
+
+            const rightPanel = document.getElementById("rightPanel");
+            const toggleBtn = document.getElementById("toggleBtn");
+            const collapsedTab = document.getElementById("collapsedTab");
+            const canvasEditControls =
+                document.getElementById("canvasEditControls");
+            const editControlsToggle =
+                document.getElementById("editControlsToggle");
+
+            const pointsSection = document.getElementById("pointsSection");
+            const equationsSection =
+                document.getElementById("equationsSection");
+            const pointsToggle = document.getElementById("pointsToggle");
+            const equationsToggle = document.getElementById("equationsToggle");
+            const pointsList = document.getElementById("pointsList");
+            const equationsDiv = document.getElementById("equations");
+            const lengthStat = document.getElementById("lengthStat");
+            const activeStat = document.getElementById("activeStat");
+
+            const state = {
+                n: 8,
+                centerX: 450,
+                centerY: 450,
+                originX: 450,
+                originY: 450,
+                radius: 260,
+                canvasWidth: 900,
+                canvasHeight: 900,
+                viewScale: 1,
+                dragIndex: -1,
+                isPanning: false,
+                panStartX: 0,
+                panStartY: 0,
+                panOriginX: 0,
+                panOriginY: 0,
+                dragRadius: 13,
+                pointRadius: 7.5,
+                points: [],
+                collapsed: false,
+                editControlsCollapsed: false,
+                sectionsCollapsed: {
+                    points: false,
+                    equations: false,
+                },
+            };
+
+            function updateCanvasGeometry(width, height) {
+                state.canvasWidth = width;
+                state.canvasHeight = height;
+                state.centerX = width / 2;
+                state.centerY = height / 2;
+                state.radius = Math.max(
+                    20,
+                    (Math.min(width, height) / 2 - 36) / state.viewScale,
+                );
+            }
+
+            function makeDefaultPoints() {
+                const pts = [];
+                for (let i = 0; i < state.n; i++) {
+                    const a = (i / state.n) * Math.PI * 2;
+                    pts.push({
+                        x: state.radius * Math.cos(a),
+                        y: state.radius * Math.sin(a),
+                    });
+                }
+                return pts;
+            }
+
+            function resetPoints() {
+                state.n = 8;
+                state.viewScale = 1;
+                fitCanvasToPanel();
+                state.originX = state.centerX;
+                state.originY = state.centerY;
+                state.points = makeDefaultPoints();
+                state.dragIndex = -1;
+                renderAll();
+            }
+
+            function addPoint() {
+                const last = state.points[state.points.length - 1];
+                state.points.push({
+                    x: last.x + 20 / state.viewScale,
+                    y: last.y - 20 / state.viewScale,
+                });
+                state.n = state.points.length;
+                keepPointsInView();
+                renderAll();
+            }
+
+            function resizeShape(factor) {
+                const scale = factor;
+                if (scale <= 0 || Math.abs(scale - 1) < 0.0001) return;
+
+                state.points = state.points.map((p) => ({
+                    x: p.x * scale,
+                    y: p.y * scale,
+                }));
+                renderAll();
+            }
+
+            function zoomView(
+                factor,
+                anchor = { x: state.centerX, y: state.centerY },
+            ) {
+                const anchorWorld = screenToWorld(anchor);
+                const nextScale = state.viewScale * factor;
+                if (!Number.isFinite(nextScale) || nextScale <= 0) return;
+                if (nextScale === state.viewScale) return;
+                state.viewScale = nextScale;
+                state.originX = anchor.x - anchorWorld.x * state.viewScale;
+                state.originY = anchor.y + anchorWorld.y * state.viewScale;
+                draw();
+            }
+
+            function removePoint() {
+                if (state.points.length <= 4) return;
+                state.points.pop();
+                state.n = state.points.length;
+                state.dragIndex = -1;
+                renderAll();
+            }
+
+            function basis(u) {
+                const u2 = u * u;
+                const u3 = u2 * u;
+                return [
+                    (1 - 3 * u + 3 * u2 - u3) / 6,
+                    (4 - 6 * u2 + 3 * u3) / 6,
+                    (1 + 3 * u + 3 * u2 - 3 * u3) / 6,
+                    u3 / 6,
+                ];
+            }
+
+            function segmentCoeffs(j) {
+                const n = state.points.length;
+                const p0 = state.points[(j - 1 + n) % n];
+                const p1 = state.points[j];
+                const p2 = state.points[(j + 1) % n];
+                const p3 = state.points[(j + 2) % n];
+
+                return {
+                    ax: (-p0.x + 3 * p1.x - 3 * p2.x + p3.x) / 6,
+                    bx: (3 * p0.x - 6 * p1.x + 3 * p2.x) / 6,
+                    cx: (-3 * p0.x + 3 * p2.x) / 6,
+                    dx: (p0.x + 4 * p1.x + p2.x) / 6,
+                    ay: (-p0.y + 3 * p1.y - 3 * p2.y + p3.y) / 6,
+                    by: (3 * p0.y - 6 * p1.y + 3 * p2.y) / 6,
+                    cy: (-3 * p0.y + 3 * p2.y) / 6,
+                    dy: (p0.y + 4 * p1.y + p2.y) / 6,
+                };
+            }
+
+            function evalSpline(t) {
+                const n = state.points.length;
+                const s = t * n;
+                let seg = Math.floor(s);
+                let u = s - seg;
+                if (seg >= n) {
+                    seg = n - 1;
+                    u = 1;
+                }
+
+                const p0 = state.points[(seg - 1 + n) % n];
+                const p1 = state.points[seg];
+                const p2 = state.points[(seg + 1) % n];
+                const p3 = state.points[(seg + 2) % n];
+
+                const b = basis(u);
+                return {
+                    x: b[0] * p0.x + b[1] * p1.x + b[2] * p2.x + b[3] * p3.x,
+                    y: b[0] * p0.y + b[1] * p1.y + b[2] * p2.y + b[3] * p3.y,
+                };
+            }
+
+            function approximateLength(samples = 700) {
+                let len = 0;
+                let prev = evalSpline(0);
+                for (let i = 1; i <= samples; i++) {
+                    const p = evalSpline(i / samples);
+                    len += Math.hypot(p.x - prev.x, p.y - prev.y);
+                    prev = p;
+                }
+                return len;
+            }
+
+            function clamp(value, min, max) {
+                return Math.max(min, Math.min(max, value));
+            }
+
+            function keepPointsInView() {
+                const left = screenToWorld({ x: state.pointRadius, y: 0 }).x;
+                const right = screenToWorld({
+                    x: state.canvasWidth - state.pointRadius,
+                    y: 0,
+                }).x;
+                const bottom = screenToWorld({
+                    x: 0,
+                    y: state.canvasHeight - state.pointRadius,
+                }).y;
+                const top = screenToWorld({ x: 0, y: state.pointRadius }).y;
+                state.points.forEach((p) => {
+                    p.x = clamp(p.x, left, right);
+                    p.y = clamp(p.y, bottom, top);
+                });
+            }
+
+            function worldToScreen(p) {
+                return {
+                    x: state.originX + p.x * state.viewScale,
+                    y: state.originY - p.y * state.viewScale,
+                };
+            }
+
+            function screenToWorld(p) {
+                return {
+                    x: (p.x - state.originX) / state.viewScale,
+                    y: (state.originY - p.y) / state.viewScale,
+                };
+            }
+
+            function fitCanvasToPanel() {
+                const card = canvas.parentElement;
+                const styles = getComputedStyle(card);
+                const horizontalPadding =
+                    parseFloat(styles.paddingLeft) +
+                    parseFloat(styles.paddingRight);
+                const verticalPadding =
+                    parseFloat(styles.paddingTop) +
+                    parseFloat(styles.paddingBottom);
+                const width = Math.max(
+                    240,
+                    card.clientWidth - horizontalPadding,
+                );
+                const height = Math.max(
+                    240,
+                    card.clientHeight - verticalPadding,
+                );
+                const dpr = Math.max(1, window.devicePixelRatio || 1);
+                const oldWidth = state.canvasWidth;
+                const oldHeight = state.canvasHeight;
+                const hadPoints = state.points.length > 0;
+
+                canvas.style.width = width + "px";
+                canvas.style.height = height + "px";
+                canvas.width = Math.round(width * dpr);
+                canvas.height = Math.round(height * dpr);
+
+                ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+                updateCanvasGeometry(width, height);
+                if (!hadPoints) {
+                    state.originX = state.centerX;
+                    state.originY = state.centerY;
+                } else {
+                    state.originX += (width - oldWidth) / 2;
+                    state.originY += (height - oldHeight) / 2;
+                }
+                if (!state.points.length) state.points = makeDefaultPoints();
+            }
+
+            function niceGridStep(targetWorldStep) {
+                const exponent = Math.floor(Math.log10(targetWorldStep));
+                const magnitude = 10 ** exponent;
+                const normalized = targetWorldStep / magnitude;
+
+                if (normalized <= 1) return magnitude;
+                if (normalized <= 2.5) return 2 * magnitude;
+                if (normalized <= 5) return 5 * magnitude;
+                return 10 * magnitude;
+            }
+
+            function formatTickLabel(value, step) {
+                if (Math.abs(value) < step * 0.0001) return "0";
+                const decimals = Math.max(0, -Math.floor(Math.log10(step)) + 1);
+                const fixed = value.toFixed(Math.min(decimals, 4));
+                return fixed.includes(".")
+                    ? fixed.replace(/\.?0+$/, "")
+                    : fixed;
+            }
+
+            function drawGrid(width, height) {
+                ctx.save();
+
+                const targetMajorGridPx = 100;
+                const majorStep = niceGridStep(
+                    targetMajorGridPx / state.viewScale,
+                );
+                const minorStep = majorStep / 10;
+                const minX = screenToWorld({ x: 0, y: 0 }).x;
+                const maxX = screenToWorld({ x: width, y: 0 }).x;
+                const minY = screenToWorld({ x: 0, y: height }).y;
+                const maxY = screenToWorld({ x: 0, y: 0 }).y;
+
+                ctx.strokeStyle = "rgba(148, 163, 184, 0.1)";
+                ctx.lineWidth = 1;
+
+                for (
+                    let x = Math.ceil(minX / minorStep) * minorStep;
+                    x <= maxX;
+                    x += minorStep
+                ) {
+                    const sx = worldToScreen({ x, y: 0 }).x;
+                    ctx.beginPath();
+                    ctx.moveTo(sx, 0);
+                    ctx.lineTo(sx, height);
+                    ctx.stroke();
+                }
+                for (
+                    let y = Math.ceil(minY / minorStep) * minorStep;
+                    y <= maxY;
+                    y += minorStep
+                ) {
+                    const sy = worldToScreen({ x: 0, y }).y;
+                    ctx.beginPath();
+                    ctx.moveTo(0, sy);
+                    ctx.lineTo(width, sy);
+                    ctx.stroke();
+                }
+
+                ctx.strokeStyle = "rgba(100, 116, 139, 0.24)";
+                ctx.lineWidth = 1.15;
+
+                for (
+                    let x = Math.ceil(minX / majorStep) * majorStep;
+                    x <= maxX;
+                    x += majorStep
+                ) {
+                    const sx = worldToScreen({ x, y: 0 }).x;
+                    ctx.beginPath();
+                    ctx.moveTo(sx, 0);
+                    ctx.lineTo(sx, height);
+                    ctx.stroke();
+                }
+                for (
+                    let y = Math.ceil(minY / majorStep) * majorStep;
+                    y <= maxY;
+                    y += majorStep
+                ) {
+                    const sy = worldToScreen({ x: 0, y }).y;
+                    ctx.beginPath();
+                    ctx.moveTo(0, sy);
+                    ctx.lineTo(width, sy);
+                    ctx.stroke();
+                }
+
+                ctx.strokeStyle = "rgba(31, 41, 55, 0.7)";
+                ctx.lineWidth = 1.5;
+                ctx.beginPath();
+                ctx.moveTo(0, state.originY);
+                ctx.lineTo(width, state.originY);
+                ctx.moveTo(state.originX, 0);
+                ctx.lineTo(state.originX, height);
+                ctx.stroke();
+
+                ctx.fillStyle = "#374151";
+                ctx.font = "12px Inter, sans-serif";
+                const axisLabelY = clamp(state.originY - 8, 10, height - 24);
+                const axisLabelX = clamp(state.originX + 8, 8, width - 24);
+                ctx.fillText("x", width - 18, axisLabelY);
+                ctx.fillText("y", axisLabelX, 16);
+                if (
+                    state.originX >= 0 &&
+                    state.originX <= width &&
+                    state.originY >= 0 &&
+                    state.originY <= height
+                ) {
+                    ctx.fillText(
+                        "(0, 0)",
+                        state.originX + 8,
+                        state.originY - 8,
+                    );
+                }
+
+                ctx.fillStyle = "rgba(55, 65, 81, 0.86)";
+                ctx.font = "11px Inter, sans-serif";
+                ctx.textAlign = "center";
+                ctx.textBaseline = "top";
+
+                const xLabelY = clamp(state.originY + 6, 6, height - 18);
+                for (
+                    let x = Math.ceil(minX / majorStep) * majorStep;
+                    x <= maxX;
+                    x += majorStep
+                ) {
+                    if (Math.abs(x) < majorStep * 0.0001) continue;
+                    const sx = worldToScreen({ x, y: 0 }).x;
+                    ctx.fillText(formatTickLabel(x, majorStep), sx, xLabelY);
+                }
+
+                ctx.textAlign = "left";
+                ctx.textBaseline = "middle";
+                const yLabelX = clamp(state.originX + 6, 6, width - 46);
+                for (
+                    let y = Math.ceil(minY / majorStep) * majorStep;
+                    y <= maxY;
+                    y += majorStep
+                ) {
+                    if (Math.abs(y) < majorStep * 0.0001) continue;
+                    const sy = worldToScreen({ x: 0, y }).y;
+                    ctx.fillText(formatTickLabel(y, majorStep), yLabelX, sy);
+                }
+
+                ctx.restore();
+            }
+
+            function draw() {
+                const rect = canvas.getBoundingClientRect();
+                const width = rect.width;
+                const height = rect.height;
+                ctx.clearRect(0, 0, width, height);
+                drawGrid(width, height);
+
+                if (state.points.length < 4) return;
+
+                ctx.beginPath();
+                const start = evalSpline(0);
+                const startScreen = worldToScreen(start);
+                ctx.moveTo(startScreen.x, startScreen.y);
+                for (let i = 1; i <= 1200; i++) {
+                    const p = evalSpline(i / 1200);
+                    const screen = worldToScreen(p);
+                    ctx.lineTo(screen.x, screen.y);
+                }
+                ctx.closePath();
+                ctx.strokeStyle = "#2563eb";
+                ctx.lineWidth = 3;
+                ctx.lineJoin = "round";
+                ctx.lineCap = "round";
+                ctx.stroke();
+
+                ctx.beginPath();
+                const firstPoint = worldToScreen(state.points[0]);
+                ctx.moveTo(firstPoint.x, firstPoint.y);
+                for (let i = 1; i < state.points.length; i++) {
+                    const p = worldToScreen(state.points[i]);
+                    ctx.lineTo(p.x, p.y);
+                }
+                ctx.closePath();
+                ctx.strokeStyle = "rgba(107, 114, 128, 0.6)";
+                ctx.lineWidth = 1.5;
+                ctx.setLineDash([7, 6]);
+                ctx.stroke();
+                ctx.setLineDash([]);
+
+                state.points.forEach((p, i) => {
+                    const screen = worldToScreen(p);
+                    ctx.beginPath();
+                    ctx.arc(
+                        screen.x,
+                        screen.y,
+                        state.pointRadius,
+                        0,
+                        Math.PI * 2,
+                    );
+                    ctx.fillStyle =
+                        i === state.dragIndex ? "#ef4444" : "#2563eb";
+                    ctx.fill();
+                    ctx.lineWidth = 2;
+                    ctx.strokeStyle = "#ffffff";
+                    ctx.stroke();
+                });
+            }
+
+            function formatNum(x) {
+                const s = x.toFixed(3);
+                return Math.abs(x) < 0.0005 ? "0.000" : s;
+            }
+
+            function formatSignedNum(x, isFirst = false) {
+                const value = formatNum(Math.abs(x));
+                if (isFirst) return x < 0 ? `-${value}` : value;
+                return x < 0 ? `- ${value}` : `+ ${value}`;
+            }
+
+            function polynomialLatex(label, j, a, b, c, d) {
+                return `
+        \\[
+          \\begin{aligned}
+            ${label}_${j}(u) &= ${formatSignedNum(a, true)}u^3 ${formatSignedNum(b)}u^2 \\\\
+            &\\quad ${formatSignedNum(c)}u ${formatSignedNum(d)}
+          \\end{aligned}
+        \\]
+      `;
+            }
+
+            function updatePointsList() {
+                let html = "";
+                state.points.forEach((p, i) => {
+                    html += `<div><strong>P${i}</strong> = (${p.x.toFixed(2)}, ${p.y.toFixed(2)})</div>`;
+                });
+                pointsList.innerHTML = html;
+            }
+
+            function updateEquations() {
+                let html = "";
+                for (let j = 0; j < state.points.length; j++) {
+                    const c = segmentCoeffs(j);
+                    html += `
+          <div class="eq-block">
+            <div class="eq-label">Segment ${j}</div>
+            <div>${polynomialLatex("x", j, c.ax, c.bx, c.cx, c.dx)}</div>
+            <div>${polynomialLatex("y", j, c.ay, c.by, c.cy, c.dy)}</div>
+          </div>
+        `;
+                }
+                equationsDiv.innerHTML = html;
+                if (window.MathJax?.typesetPromise) {
+                    MathJax.typesetPromise([equationsDiv]).catch(() => {});
+                }
+            }
+
+            function updateStats() {
+                lengthStat.textContent = `Length: ${approximateLength().toFixed(2)} units`;
+                activeStat.textContent =
+                    state.dragIndex >= 0
+                        ? `Active point: P${state.dragIndex}`
+                        : "Active point: none";
+            }
+
+            function renderAll() {
+                fitCanvasToPanel();
+                draw();
+                updatePointsList();
+                updateEquations();
+                updateStats();
+            }
+
+            function getMousePos(evt) {
+                const rect = canvas.getBoundingClientRect();
+                return {
+                    x: evt.clientX - rect.left,
+                    y: evt.clientY - rect.top,
+                };
+            }
+
+            function hitTest(pos) {
+                for (let i = 0; i < state.points.length; i++) {
+                    const p = worldToScreen(state.points[i]);
+                    if (
+                        Math.hypot(p.x - pos.x, p.y - pos.y) <= state.dragRadius
+                    )
+                        return i;
+                }
+                return -1;
+            }
+
+            canvas.addEventListener("pointerdown", (e) => {
+                const pos = getMousePos(e);
+                const idx = hitTest(pos);
+                if (idx !== -1) {
+                    state.dragIndex = idx;
+                    canvas.setPointerCapture(e.pointerId);
+                    renderAll();
+                } else {
+                    state.isPanning = true;
+                    state.panStartX = pos.x;
+                    state.panStartY = pos.y;
+                    state.panOriginX = state.originX;
+                    state.panOriginY = state.originY;
+                    canvas.setPointerCapture(e.pointerId);
+                }
+            });
+
+            canvas.addEventListener("pointermove", (e) => {
+                const pos = getMousePos(e);
+                if (state.isPanning) {
+                    state.originX = state.panOriginX + pos.x - state.panStartX;
+                    state.originY = state.panOriginY + pos.y - state.panStartY;
+                    draw();
+                    return;
+                }
+
+                if (state.dragIndex === -1) return;
+                const rect = canvas.getBoundingClientRect();
+                const clampedScreen = {
+                    x: clamp(
+                        pos.x,
+                        state.pointRadius,
+                        rect.width - state.pointRadius,
+                    ),
+                    y: clamp(
+                        pos.y,
+                        state.pointRadius,
+                        rect.height - state.pointRadius,
+                    ),
+                };
+                state.points[state.dragIndex] = screenToWorld(clampedScreen);
+                draw();
+                updatePointsList();
+                updateEquations();
+                updateStats();
+            });
+
+            canvas.addEventListener(
+                "wheel",
+                (e) => {
+                    e.preventDefault();
+                    zoomView(e.deltaY < 0 ? 1.08 : 0.92, getMousePos(e));
+                },
+                { passive: false },
+            );
+
+            function endDrag() {
+                state.dragIndex = -1;
+                state.isPanning = false;
+                renderAll();
+            }
+
+            canvas.addEventListener("pointerup", endDrag);
+            canvas.addEventListener("pointercancel", endDrag);
+
+            toggleBtn.addEventListener("click", () => {
+                state.collapsed = !state.collapsed;
+                rightPanel.classList.toggle("collapsed", state.collapsed);
+                toggleBtn.textContent = state.collapsed ? "⇨" : "⇦";
+                toggleBtn.title = state.collapsed
+                    ? "Expand panel"
+                    : "Collapse panel";
+
+                setTimeout(renderAll, 280);
+            });
+
+            collapsedTab.addEventListener("click", () => {
+                state.collapsed = false;
+                rightPanel.classList.remove("collapsed");
+                toggleBtn.textContent = "⇦";
+                toggleBtn.title = "Collapse panel";
+                setTimeout(renderAll, 280);
+            });
+
+            function toggleSection(
+                name,
+                section,
+                button,
+                expandedTitle,
+                collapsedTitle,
+            ) {
+                state.sectionsCollapsed[name] = !state.sectionsCollapsed[name];
+                const isCollapsed = state.sectionsCollapsed[name];
+                section.classList.toggle("collapsed", isCollapsed);
+                button.textContent = isCollapsed ? "+" : "−";
+                button.title = isCollapsed ? collapsedTitle : expandedTitle;
+            }
+
+            pointsToggle.addEventListener("click", () => {
+                toggleSection(
+                    "points",
+                    pointsSection,
+                    pointsToggle,
+                    "Collapse control points",
+                    "Expand control points",
+                );
+            });
+
+            equationsToggle.addEventListener("click", () => {
+                toggleSection(
+                    "equations",
+                    equationsSection,
+                    equationsToggle,
+                    "Collapse parametric equations",
+                    "Expand parametric equations",
+                );
+            });
+
+            editControlsToggle.addEventListener("click", () => {
+                state.editControlsCollapsed = !state.editControlsCollapsed;
+                canvasEditControls.classList.toggle(
+                    "collapsed",
+                    state.editControlsCollapsed,
+                );
+                editControlsToggle.title = state.editControlsCollapsed
+                    ? "Expand canvas controls"
+                    : "Collapse canvas controls";
+            });
+
+            window.addEventListener("resize", renderAll);
+
+            renderAll();
+        </script>
+    </body>
+</html>
